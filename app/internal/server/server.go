@@ -39,7 +39,7 @@ func (s *Server) Run() error {
 	// clean expired items
 	go s.db.DeleteExpiredItems()
 
-	acksChan := make(chan int, 10)
+	acksChan := make(chan struct{}, 10)
 	locker := &sync.RWMutex{}
 
 	for {
@@ -62,7 +62,7 @@ func (s *Server) Handshake() error {
 		return fmt.Errorf("failed to dial with master error: %w", err)
 	}
 
-	acksChan := make(chan int, 10)
+	acksChan := make(chan struct{}, 10)
 	connHandler := command.NewHandler(s.db, conn, s.cfg, acksChan, &sync.RWMutex{})
 	if err := connHandler.Handshake(); err != nil {
 		return fmt.Errorf("failed to handshake, error: %w", err)

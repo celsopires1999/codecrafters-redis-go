@@ -35,13 +35,7 @@ func (s *Store) Set(k, v string, expires bool, intTime int64) {
 		expireAt = time.Now().Add(time.Duration(intTime) * time.Millisecond)
 	}
 
-	s.mu.Lock()
-	s.kv[k] = StoreItem{
-		value:    v,
-		expires:  expires,
-		expireAt: expireAt,
-	}
-	s.mu.Unlock()
+	s.save(k, v, expires, expireAt)
 }
 
 func (s *Store) Load(k, v string, expires bool, xp int64) {
@@ -50,6 +44,10 @@ func (s *Store) Load(k, v string, expires bool, xp int64) {
 		expireAt = time.UnixMilli(xp)
 	}
 
+	s.save(k, v, expires, expireAt)
+}
+
+func (s *Store) save(k, v string, expires bool, expireAt time.Time) {
 	s.mu.Lock()
 	s.kv[k] = StoreItem{
 		value:    v,
@@ -134,24 +132,21 @@ func (s *Store) ReadRDBFile(path string) error {
 	if err == io.EOF || err == nil {
 		return nil
 	}
-	// if err != nil {
-	// 	return err
-	// }
+
 	return err
 }
 
 func (s *Store) loadFileContent(reader *bufio.Reader) error {
+	opcode, err := reader.ReadByte()
+	if err != nil {
+		return err
+	}
+	// End of the RDB file
+	if opcode == rdb.END_OPCODE {
+		return nil
+	}
+
 	for {
-		opcode, err := reader.ReadByte()
-		if err != nil {
-			return err
-		}
-
-		// End of the RDB file
-		if opcode == rdb.END_OPCODE {
-			return nil
-		}
-
 		if opcode == rdb.OPCODE_SELECTDB {
 			err = rdb.ReadSelectDB(reader)
 			if err != nil {
@@ -171,6 +166,12 @@ func (s *Store) loadFileContent(reader *bufio.Reader) error {
 		if err != nil {
 			return err
 		}
+
+		// End of the RDB file
+		if opcode == rdb.END_OPCODE {
+			return nil
+		}
+
 		expires := false
 		xp := int64(0)
 

@@ -203,7 +203,6 @@ func handleWait(h *Handler, userCommand *Command) error {
 		return err
 	}
 
-	// h.SetAckSlaves(0)
 	h.sendGetAckToSlaves()
 	acks := 0
 

@@ -43,9 +43,8 @@ type Handler struct {
 	reader       *bufio.Reader
 	writer       *bufio.Writer
 	slavesOffset int
-	ackSlaves    int
 	acksLock     *sync.RWMutex
-	acksChan     chan int
+	acksChan     chan struct{}
 }
 
 var commandHandlers = map[string]func(*Handler, *Command) error{
@@ -61,7 +60,7 @@ var commandHandlers = map[string]func(*Handler, *Command) error{
 	Keys:     handleKeys,
 }
 
-func NewHandler(db *store.Store, conn net.Conn, cfg *config.Config, acksChan chan int, locker *sync.RWMutex) *Handler {
+func NewHandler(db *store.Store, conn net.Conn, cfg *config.Config, acksChan chan struct{}, locker *sync.RWMutex) *Handler {
 	return &Handler{
 		db:           db,
 		conn:         conn,
@@ -69,7 +68,6 @@ func NewHandler(db *store.Store, conn net.Conn, cfg *config.Config, acksChan cha
 		reader:       bufio.NewReader(conn),
 		writer:       bufio.NewWriter(conn),
 		slavesOffset: 0,
-		ackSlaves:    0,
 		acksLock:     locker,
 		acksChan:     acksChan,
 	}
@@ -167,28 +165,9 @@ func (h *Handler) UpdateSlavesOffset(commandBytes int) {
 	h.slavesOffset += commandBytes
 }
 
-// func (h *Handler) AckSlaves() int {
-// 	h.acksLock.RLock()
-// 	defer h.acksLock.RUnlock()
-// 	return h.ackSlaves
-// }
-
 func (h *Handler) NotifyAckSlaves() {
-	h.acksChan <- 1
+	h.acksChan <- struct{}{}
 }
-
-// func (h *Handler) IncrementAckSlaves() {
-// 	h.acksLock.Lock()
-// 	h.ackSlaves++
-// 	h.acksLock.Unlock()
-// 	h.acksChan <- h.ackSlaves
-// }
-
-// func (h *Handler) SetAckSlaves(val int) {
-// 	h.acksLock.Lock()
-// 	h.ackSlaves = val
-// 	h.acksLock.Unlock()
-// }
 
 func (h *Handler) handleCommand(userCommand *Command) error {
 	instruction := strings.ToLower(userCommand.Args[0])

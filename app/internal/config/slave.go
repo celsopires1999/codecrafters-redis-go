@@ -17,10 +17,8 @@ func NewSlave(conn net.Conn) *Slave {
 	}
 }
 
-// func (s *Slave) PropagateCommand(args []string, wg *sync.WaitGroup) {
 func (s *Slave) PropagateCommand(command string, wg *sync.WaitGroup) {
 	defer wg.Done()
-	// command := encoder.NewArray(args)
 
 	s.mu.Lock()
 	writer := bufio.NewWriter(s.conn)
