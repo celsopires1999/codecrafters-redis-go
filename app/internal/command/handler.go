@@ -25,6 +25,7 @@ const (
 	Wait     = "wait"
 	Config   = "config"
 	Keys     = "keys"
+	Type     = "type"
 )
 
 const (
@@ -58,6 +59,7 @@ var commandHandlers = map[string]func(*Handler, *Command) error{
 	Wait:     handleWait,
 	Config:   handleConfig,
 	Keys:     handleKeys,
+	Type:     handleType,
 }
 
 func NewHandler(db *store.Store, conn net.Conn, cfg *config.Config, acksChan chan struct{}, locker *sync.RWMutex) *Handler {

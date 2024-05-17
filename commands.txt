@@ -21,6 +21,10 @@ redis-cli WAIT 2 500 # (must wait until either 2 replicas have processed previou
 redis-cli CONFIG GET dir
 redis-cli CONFIG GET dbfilename
 
+redis-cli SET bar 456
+redis-cli TYPE bar
+redis-cli TYPE missing_key
+
 *** Server Options ***
 go app/main.go
 go run app/main.go --dir . --dbfilename dump.rdb

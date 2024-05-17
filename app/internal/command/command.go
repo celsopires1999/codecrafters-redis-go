@@ -231,3 +231,17 @@ func handleKeys(h *Handler, userCommand *Command) error {
 	h.WriteResponse(encoder.NewArray(keys))
 	return nil
 }
+
+func handleType(h *Handler, userCommand *Command) error {
+	if len(userCommand.Args) < 2 {
+		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
+	}
+
+	key := userCommand.Args[1]
+	if _, err := h.db.Get(key); err == nil {
+		h.WriteResponse(encoder.NewString("string"))
+	}
+	h.WriteResponse(encoder.NewString("none"))
+
+	return nil
+}
