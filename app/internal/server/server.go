@@ -16,14 +16,16 @@ const (
 )
 
 type Server struct {
-	cfg *config.Config
-	db  *store.Store
+	cfg    *config.Config
+	db     *store.Store
+	stream *store.Stream
 }
 
-func NewServer(cfg *config.Config, db *store.Store) *Server {
+func NewServer(cfg *config.Config, db *store.Store, stream *store.Stream) *Server {
 	return &Server{
-		cfg: cfg,
-		db:  db,
+		cfg:    cfg,
+		db:     db,
+		stream: stream,
 	}
 }
 
@@ -50,7 +52,7 @@ func (s *Server) Run() error {
 			continue
 		}
 		// handle client connection
-		connHandler := command.NewHandler(s.db, conn, s.cfg, acksChan, locker)
+		connHandler := command.NewHandler(s.db, s.stream, conn, s.cfg, acksChan, locker)
 
 		go s.serveConnection(connHandler)
 	}
@@ -63,7 +65,7 @@ func (s *Server) Handshake() error {
 	}
 
 	acksChan := make(chan struct{}, 10)
-	connHandler := command.NewHandler(s.db, conn, s.cfg, acksChan, &sync.RWMutex{})
+	connHandler := command.NewHandler(s.db, s.stream, conn, s.cfg, acksChan, &sync.RWMutex{})
 	if err := connHandler.Handshake(); err != nil {
 		return fmt.Errorf("failed to handshake, error: %w", err)
 	}

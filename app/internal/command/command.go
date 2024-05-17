@@ -238,10 +238,34 @@ func handleType(h *Handler, userCommand *Command) error {
 	}
 
 	key := userCommand.Args[1]
+
+	if h.stream.Exists(key) == nil {
+		h.WriteResponse(encoder.NewString("stream"))
+	}
+
 	if _, err := h.db.Get(key); err == nil {
 		h.WriteResponse(encoder.NewString("string"))
 	}
 	h.WriteResponse(encoder.NewString("none"))
+
+	return nil
+}
+
+func handleXadd(h *Handler, userCommand *Command) error {
+	if len(userCommand.Args) < 5 {
+		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
+	}
+	streamId := userCommand.Args[1]
+	entryId := userCommand.Args[2]
+	entries := userCommand.Args[3:]
+
+	if len(entries)%2 != 0 {
+		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
+	}
+
+	h.stream.Set(streamId, entryId, entries)
+
+	h.WriteResponse(encoder.NewString(entryId))
 
 	return nil
 }

@@ -16,6 +16,7 @@ func main() {
 	options := setServerOptions()
 	cfg := config.NewConfig(options...)
 	db := store.NewStore()
+	stream := store.NewStream()
 
 	log.Println("searching for rdb file to load data...")
 	err := db.ReadRDBFile(cfg.RDBFilePath())
@@ -23,7 +24,7 @@ func main() {
 		log.Printf("Error: %s\n failed to read rdb file, starting the server with empty data...\n", err.Error())
 	}
 
-	server := server.NewServer(cfg, db)
+	server := server.NewServer(cfg, db, stream)
 
 	if cfg.Role() == "slave" {
 		if err := server.Handshake(); err != nil {

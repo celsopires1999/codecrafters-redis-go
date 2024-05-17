@@ -21,9 +21,26 @@ redis-cli WAIT 2 500 # (must wait until either 2 replicas have processed previou
 redis-cli CONFIG GET dir
 redis-cli CONFIG GET dbfilename
 
+### TYPE ###
 redis-cli SET bar 456
 redis-cli TYPE bar
 redis-cli TYPE missing_key
+
+
+### XADD ###
+$ redis-cli XADD stream_key 1526919030474-0 temperature 36 humidity 95
+"1526919030474-0" # (ID of the entry created)
+
+$ redis-cli XADD stream_key 0-1 foo bar
+"0-1"
+
+redis-cli xadd "raspberry" "0-1" foo bar
+redis-cli type "raspberry"
+"stream"
+
+$ redis-cli TYPE stream_key
+"stream"
+
 
 *** Server Options ***
 go app/main.go

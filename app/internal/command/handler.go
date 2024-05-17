@@ -26,6 +26,7 @@ const (
 	Config   = "config"
 	Keys     = "keys"
 	Type     = "type"
+	Xadd     = "xadd"
 )
 
 const (
@@ -39,6 +40,7 @@ const (
 
 type Handler struct {
 	db           *store.Store
+	stream       *store.Stream
 	conn         net.Conn
 	cfg          *config.Config
 	reader       *bufio.Reader
@@ -60,11 +62,13 @@ var commandHandlers = map[string]func(*Handler, *Command) error{
 	Config:   handleConfig,
 	Keys:     handleKeys,
 	Type:     handleType,
+	Xadd:     handleXadd,
 }
 
-func NewHandler(db *store.Store, conn net.Conn, cfg *config.Config, acksChan chan struct{}, locker *sync.RWMutex) *Handler {
+func NewHandler(db *store.Store, stream *store.Stream, conn net.Conn, cfg *config.Config, acksChan chan struct{}, locker *sync.RWMutex) *Handler {
 	return &Handler{
 		db:           db,
+		stream:       stream,
 		conn:         conn,
 		cfg:          cfg,
 		reader:       bufio.NewReader(conn),
