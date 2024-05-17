@@ -2,6 +2,7 @@ package store
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -32,6 +33,21 @@ func (s *Store) Set(k, v string, expires bool, intTime int64) {
 	var expireAt time.Time
 	if expires {
 		expireAt = time.Now().Add(time.Duration(intTime) * time.Millisecond)
+	}
+
+	s.mu.Lock()
+	s.kv[k] = StoreItem{
+		value:    v,
+		expires:  expires,
+		expireAt: expireAt,
+	}
+	s.mu.Unlock()
+}
+
+func (s *Store) Load(k, v string, expires bool, xp int64) {
+	var expireAt time.Time
+	if expires {
+		expireAt = time.UnixMilli(xp)
 	}
 
 	s.mu.Lock()
@@ -148,20 +164,36 @@ func (s *Store) loadFileContent(reader *bufio.Reader) error {
 			if err != nil {
 				return err
 			}
-			reader.Discard(1) // adjust for
 		}
 
-		// Skipping exp time bytes
+		// Exp time byte
+		opcode, err = reader.ReadByte()
+		if err != nil {
+			return err
+		}
+		expires := false
+		xp := int64(0)
+
 		if opcode == rdb.OPCODE_EXPIRETIME_MS {
-			fmt.Println("SKIPPING MS EXP TIME")
-			reader.Discard(9)
+			expires = true
+			ex := make([]byte, 9)
+			_, err = reader.Read(ex)
+			if err != nil {
+				return err
+			}
+			xp = int64(binary.LittleEndian.Uint64(ex))
 		}
 		if opcode == rdb.OPCODE_EXPIRETIME {
-			fmt.Println("SKIPPING NOT MS EXP TIME")
-			reader.Discard(5)
+			expires = true
+			ex := make([]byte, 5)
+			_, err = reader.Read(ex)
+			if err != nil {
+				return err
+			}
+			xp = int64(binary.LittleEndian.Uint64(ex)) * 1000
 		}
 
-		// Length Encoding
+		// Key Encoding
 		keyLength, err := rdb.LengthEncodedInt(reader)
 		if err != nil {
 			return err
@@ -172,7 +204,7 @@ func (s *Store) loadFileContent(reader *bufio.Reader) error {
 			return err
 		}
 
-		// Length Encoding
+		// Value Encoding
 		valueLength, err := rdb.LengthEncodedInt(reader)
 		if err != nil {
 			return err
@@ -183,8 +215,6 @@ func (s *Store) loadFileContent(reader *bufio.Reader) error {
 			return err
 		}
 
-		// TODO: add support por exp time latter
-		fmt.Printf("READ KEY: %s, READ VAL: %s\n", string(keyBytes), string(valueBytes))
-		s.Set(string(keyBytes), string(valueBytes), false, 0)
+		s.Load(string(keyBytes), string(valueBytes), expires, xp)
 	}
 }
