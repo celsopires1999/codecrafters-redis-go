@@ -13,6 +13,11 @@ import (
 )
 
 type Store struct {
+	StringType
+	StreamType
+}
+
+type StringType struct {
 	kv map[string]StoreItem
 	mu sync.Mutex
 }
@@ -25,11 +30,16 @@ type StoreItem struct {
 
 func NewStore() *Store {
 	return &Store{
-		kv: make(map[string]StoreItem),
+		StringType{
+			kv: make(map[string]StoreItem),
+		},
+		StreamType{
+			stream: make(map[StreamId]map[EntryId][]Entry),
+		},
 	}
 }
 
-func (s *Store) Set(k, v string, expires bool, intTime int64) {
+func (s *StringType) Set(k, v string, expires bool, intTime int64) {
 	var expireAt time.Time
 	if expires {
 		expireAt = time.Now().Add(time.Duration(intTime) * time.Millisecond)
@@ -38,7 +48,7 @@ func (s *Store) Set(k, v string, expires bool, intTime int64) {
 	s.save(k, v, expires, expireAt)
 }
 
-func (s *Store) Load(k, v string, expires bool, xp int64) {
+func (s *StringType) Load(k, v string, expires bool, xp int64) {
 	var expireAt time.Time
 	if expires {
 		expireAt = time.UnixMilli(xp)
@@ -47,7 +57,7 @@ func (s *Store) Load(k, v string, expires bool, xp int64) {
 	s.save(k, v, expires, expireAt)
 }
 
-func (s *Store) save(k, v string, expires bool, expireAt time.Time) {
+func (s *StringType) save(k, v string, expires bool, expireAt time.Time) {
 	s.mu.Lock()
 	s.kv[k] = StoreItem{
 		value:    v,
@@ -57,7 +67,7 @@ func (s *Store) save(k, v string, expires bool, expireAt time.Time) {
 	s.mu.Unlock()
 }
 
-func (s *Store) Get(k string) (string, error) {
+func (s *StringType) Get(k string) (string, error) {
 	s.mu.Lock()
 	item, ok := s.kv[k]
 	s.mu.Unlock()
@@ -72,7 +82,7 @@ func (s *Store) Get(k string) (string, error) {
 	return item.value, nil
 }
 
-func (s *Store) DeleteExpiredItems() {
+func (s *StringType) DeleteExpiredItems() {
 	for {
 		time.Sleep(100 * time.Millisecond)
 		keys := make([]string, 0)
@@ -85,7 +95,7 @@ func (s *Store) DeleteExpiredItems() {
 	}
 }
 
-func (s *Store) DeleteItems(keys []string) {
+func (s *StringType) DeleteItems(keys []string) {
 	s.mu.Lock()
 	for _, key := range keys {
 		delete(s.kv, key)
@@ -93,7 +103,7 @@ func (s *Store) DeleteItems(keys []string) {
 	s.mu.Unlock()
 }
 
-func (s *Store) GetKeys() []string {
+func (s *StringType) GetKeys() []string {
 	keys := make([]string, 0, len(s.kv))
 	for k := range s.kv {
 		keys = append(keys, k)
@@ -102,7 +112,7 @@ func (s *Store) GetKeys() []string {
 	return keys
 }
 
-func (s *Store) ReadRDBFile(path string) error {
+func (s *StringType) ReadRDBFile(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -136,7 +146,7 @@ func (s *Store) ReadRDBFile(path string) error {
 	return err
 }
 
-func (s *Store) loadFileContent(reader *bufio.Reader) error {
+func (s *StringType) loadFileContent(reader *bufio.Reader) error {
 	opcode, err := reader.ReadByte()
 	if err != nil {
 		return err

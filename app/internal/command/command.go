@@ -71,7 +71,7 @@ func handleSet(h *Handler, userCommand *Command) error {
 		}
 	}
 
-	h.db.Set(key, value, expires, expTime)
+	h.db.StringType.Set(key, value, expires, expTime)
 	if h.cfg.Role() == config.RoleMaster {
 		wg := sync.WaitGroup{}
 		command := encoder.NewArray(userCommand.Args)
@@ -239,15 +239,17 @@ func handleType(h *Handler, userCommand *Command) error {
 
 	key := userCommand.Args[1]
 
-	if h.stream.Exists(key) == nil {
+	if h.db.StreamType.ExistsStream(key) == nil {
 		h.WriteResponse(encoder.NewString("stream"))
+		return nil
 	}
 
-	if _, err := h.db.Get(key); err == nil {
+	if _, err := h.db.StringType.Get(key); err == nil {
 		h.WriteResponse(encoder.NewString("string"))
+		return nil
 	}
-	h.WriteResponse(encoder.NewString("none"))
 
+	h.WriteResponse(encoder.NewString("none"))
 	return nil
 }
 
@@ -263,7 +265,12 @@ func handleXadd(h *Handler, userCommand *Command) error {
 		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
 	}
 
-	h.stream.Set(streamId, entryId, entries)
+	if err := h.db.StreamType.ValidateEntryId(streamId, entryId); err != nil {
+		h.WriteResponse(encoder.NewError(err.Error()))
+		return nil
+	}
+
+	h.db.StreamType.Set(streamId, entryId, entries)
 
 	h.WriteResponse(encoder.NewString(entryId))
 

@@ -30,6 +30,10 @@ func NewArray(data []string) string {
 	return array
 }
 
+func NewError(data string) string {
+	return fmt.Sprintf("-ERR %s\r\n", data)
+}
+
 func NewRDBFile(fileContent []byte) string {
 	return fmt.Sprintf("$%d\r\n%s", len(fileContent), fileContent)
 }
