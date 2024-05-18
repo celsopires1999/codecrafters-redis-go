@@ -9,6 +9,7 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/internal/config"
 	"github.com/codecrafters-io/redis-starter-go/app/internal/encoder"
+	"github.com/codecrafters-io/redis-starter-go/app/internal/store"
 	"github.com/codecrafters-io/redis-starter-go/rdb"
 )
 
@@ -227,7 +228,7 @@ func handleWait(h *Handler, userCommand *Command) error {
 }
 
 func handleKeys(h *Handler, userCommand *Command) error {
-	keys := h.db.GetKeys()
+	keys := h.db.StringType.GetKeys()
 	h.WriteResponse(encoder.NewArray(keys))
 	return nil
 }
@@ -257,22 +258,48 @@ func handleXadd(h *Handler, userCommand *Command) error {
 	if len(userCommand.Args) < 5 {
 		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
 	}
-	streamId := userCommand.Args[1]
-	entryId := userCommand.Args[2]
-	entries := userCommand.Args[3:]
+	streamId := store.StreamId(userCommand.Args[1])
+	inputEntryId := userCommand.Args[2]
+	inputEntries := userCommand.Args[3:]
 
-	if len(entries)%2 != 0 {
+	if len(inputEntries)%2 != 0 {
 		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
 	}
 
-	if err := h.db.StreamType.ValidateEntryId(streamId, entryId); err != nil {
-		h.WriteResponse(encoder.NewError(err.Error()))
-		return nil
+	var entries []store.Entry
+	for i := 0; i < len(inputEntries); i += 2 {
+		entries = append(entries,
+			store.NewEntry(inputEntries[i], inputEntries[i+1]))
+	}
+
+	splitInputEntryId := strings.Split(inputEntryId, "-")
+	InputMilli := splitInputEntryId[0]
+	InputSequence := splitInputEntryId[1]
+
+	var entryId store.EntryId
+	var err error
+
+	switch {
+	case len(splitInputEntryId) == 2 && InputSequence == "*":
+		entryId, err = h.db.PartiallyAutoGenerateId(streamId, InputMilli)
+		if err != nil {
+			return err
+		}
+	default:
+		sequence, err := strconv.Atoi(InputSequence)
+		if err != nil {
+			return err
+		}
+		entryId = store.NewEntryId(splitInputEntryId[0], sequence)
+		if err := h.db.StreamType.ValidateEntryId(streamId, entryId); err != nil {
+			h.WriteResponse(encoder.NewError(err.Error()))
+			return nil
+		}
 	}
 
 	h.db.StreamType.Set(streamId, entryId, entries)
 
-	h.WriteResponse(encoder.NewString(entryId))
+	h.WriteResponse(encoder.NewString(entryId.String()))
 
 	return nil
 }
