@@ -8,17 +8,32 @@ import (
 )
 
 func handleXrange(h *Handler, userCommand *Command) error {
+
+	var input struct {
+		streamId string
+		start    string
+		end      string
+	}
+
 	if len(userCommand.Args) < 4 {
 		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
 	}
 
-	streamId := store.StreamId(userCommand.Args[1])
+	input.streamId = userCommand.Args[1]
+	input.start = userCommand.Args[2]
+	input.end = userCommand.Args[3]
 
-	start, err := store.ToEntryId(userCommand.Args[2], 0)
+	streamId := store.StreamId(input.streamId)
+
+	if input.start == "-" {
+		input.start = "0"
+	}
+
+	start, err := store.ToEntryId(input.start, 0)
 	if err != nil {
 		return err
 	}
-	end, err := store.ToEntryId(userCommand.Args[3], int(^uint(0)>>1))
+	end, err := store.ToEntryId(input.end, int(^uint(0)>>1))
 	if err != nil {
 		return err
 	}
