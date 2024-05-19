@@ -30,6 +30,22 @@ func NewArray(data []string) string {
 	return array
 }
 
+type ListItem struct {
+	Id     string
+	Values []string
+}
+
+func NewList(data []ListItem) string {
+	var list string
+	list += fmt.Sprintf("*%d\r\n", len(data))
+	for _, v := range data {
+		list += "*2\r\n"
+		list += NewBulkString(v.Id)
+		list += NewArray(v.Values)
+	}
+	return list
+}
+
 func NewError(data string) string {
 	return fmt.Sprintf("-ERR %s\r\n", data)
 }

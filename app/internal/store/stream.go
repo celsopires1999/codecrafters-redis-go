@@ -3,6 +3,8 @@ package store
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -17,8 +19,41 @@ func NewEntryId(milli string, sequence int) EntryId {
 	return EntryId{milli: milli, sequence: sequence}
 }
 
+func ToEntryId(s string, defaultSequence int) (EntryId, error) {
+	parts := strings.Split(s, "-")
+
+	milli := parts[0]
+	sequence := defaultSequence
+	var err error
+
+	if len(parts) == 2 {
+		sequence, err = strconv.Atoi(parts[1])
+		if err != nil {
+			return EntryId{}, err
+		}
+	}
+
+	return EntryId{milli, sequence}, nil
+}
+
 func (e EntryId) String() string {
 	return fmt.Sprintf("%s-%d", e.milli, e.sequence)
+}
+
+func (e EntryId) Compare(other EntryId) int {
+	if e.milli > other.milli {
+		return 1
+	}
+	if e.milli < other.milli {
+		return -1
+	}
+	if e.sequence > other.sequence {
+		return 1
+	}
+	if e.sequence < other.sequence {
+		return -1
+	}
+	return 0
 }
 
 type Entry struct {
@@ -28,6 +63,10 @@ type Entry struct {
 
 func NewEntry(key, value string) Entry {
 	return Entry{key: key, value: value}
+}
+
+func (e Entry) GetKV() []string {
+	return []string{e.key, e.value}
 }
 
 type StreamType struct {
@@ -135,4 +174,23 @@ func (s *StreamType) GetEntryIds(streamId StreamId) []EntryId {
 	})
 
 	return keys
+}
+
+func (s *StreamType) List(streamId StreamId, start EntryId, end EntryId) map[EntryId][]Entry {
+	output := map[EntryId][]Entry{}
+
+	for _, entryId := range s.GetEntryIds(streamId) {
+		if entryId.Compare(start) >= 0 && entryId.Compare(end) <= 0 {
+			output[entryId] = s.stream[streamId][entryId]
+		}
+	}
+
+	return output
+}
+
+func ListEntriesValues(entries []Entry) (output []string) {
+	for _, entry := range entries {
+		output = append(output, entry.GetKV()...)
+	}
+	return
 }
