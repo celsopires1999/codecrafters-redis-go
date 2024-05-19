@@ -255,42 +255,37 @@ func handleType(h *Handler, userCommand *Command) error {
 }
 
 func handleXadd(h *Handler, userCommand *Command) error {
-	if len(userCommand.Args) < 5 {
-		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
-	}
-	streamId := store.StreamId(userCommand.Args[1])
-	inputEntryId := userCommand.Args[2]
-	inputEntries := userCommand.Args[3:]
-
-	if len(inputEntries)%2 != 0 {
-		return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
+	err := validateXaddCommand(userCommand)
+	if err != nil {
+		return err
 	}
 
-	var entries []store.Entry
-	for i := 0; i < len(inputEntries); i += 2 {
-		entries = append(entries,
-			store.NewEntry(inputEntries[i], inputEntries[i+1]))
-	}
+	streamId, entries := parseStreamIdAndEntries(userCommand)
 
-	splitInputEntryId := strings.Split(inputEntryId, "-")
-	InputMilli := splitInputEntryId[0]
-	InputSequence := splitInputEntryId[1]
+	splitUserCommandEntryId := strings.Split(userCommand.Args[2], "-")
 
 	var entryId store.EntryId
-	var err error
 
 	switch {
-	case len(splitInputEntryId) == 2 && InputSequence == "*":
-		entryId, err = h.db.PartiallyAutoGenerateId(streamId, InputMilli)
+	// user command does not specify an entry id
+	case len(splitUserCommandEntryId) == 1 && splitUserCommandEntryId[0] == "*":
+		entryId, err = h.db.GenerateId(streamId, "")
 		if err != nil {
 			return err
 		}
+	// user command specifies milli part of entry id
+	case len(splitUserCommandEntryId) == 2 && splitUserCommandEntryId[1] == "*":
+		entryId, err = h.db.GenerateId(streamId, splitUserCommandEntryId[0])
+		if err != nil {
+			return err
+		}
+	// user command specifies entry id
 	default:
-		sequence, err := strconv.Atoi(InputSequence)
+		sequence, err := strconv.Atoi(splitUserCommandEntryId[1])
 		if err != nil {
 			return err
 		}
-		entryId = store.NewEntryId(splitInputEntryId[0], sequence)
+		entryId = store.NewEntryId(splitUserCommandEntryId[0], sequence)
 		if err := h.db.StreamType.ValidateEntryId(streamId, entryId); err != nil {
 			h.WriteResponse(encoder.NewError(err.Error()))
 			return nil

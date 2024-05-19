@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 )
 
 type StreamId string
@@ -87,10 +88,15 @@ func (s *StreamType) ValidateEntryId(streamId StreamId, entryId EntryId) error {
 	return fmt.Errorf("The ID specified in XADD is equal or smaller than the target stream top item")
 }
 
-func (s *StreamType) PartiallyAutoGenerateId(streamId StreamId, milli string) (EntryId, error) {
+func (s *StreamType) GenerateId(streamId StreamId, milli string) (EntryId, error) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if milli == "" {
+		timestamp := uint64(time.Now().UnixMilli())
+		milli = fmt.Sprintf("%d", timestamp)
+	}
 
 	entryIDs := s.GetEntryIds(streamId)
 
