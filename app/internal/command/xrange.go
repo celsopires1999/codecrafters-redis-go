@@ -29,6 +29,10 @@ func handleXrange(h *Handler, userCommand *Command) error {
 		input.start = "0"
 	}
 
+	if input.end == "+" {
+		input.end = "9999999999999"
+	}
+
 	start, err := store.ToEntryId(input.start, 0)
 	if err != nil {
 		return err
