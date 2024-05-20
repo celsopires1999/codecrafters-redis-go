@@ -34,7 +34,7 @@ func NewStore() *Store {
 			kv: make(map[string]StoreItem),
 		},
 		StreamType{
-			stream: make(map[StreamId]map[EntryId][]Entry),
+			stream: make(map[StreamId]map[EntryId][]Fact),
 		},
 	}
 }

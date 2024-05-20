@@ -28,6 +28,7 @@ const (
 	Type     = "type"
 	Xadd     = "xadd"
 	Xrange   = "xrange"
+	Xread    = "xread"
 )
 
 const (
@@ -64,6 +65,7 @@ var commandHandlers = map[string]func(*Handler, *Command) error{
 	Type:     handleType,
 	Xadd:     handleXadd,
 	Xrange:   handleXrange,
+	Xread:    handleXread,
 }
 
 func NewHandler(db *store.Store, conn net.Conn, cfg *config.Config, acksChan chan struct{}, locker *sync.RWMutex) *Handler {

@@ -41,16 +41,17 @@ func handleXrange(h *Handler, userCommand *Command) error {
 	if err != nil {
 		return err
 	}
-	streamEntries := h.db.StreamType.List(streamId, start, end)
-	list := []encoder.ListItem{}
-	for entryId, entries := range streamEntries {
-		i := encoder.ListItem{
-			Id:     entryId.String(),
-			Values: store.ListEntriesValues(entries),
+	streamEntries := h.db.StreamType.FindStarEnd(streamId, start, end)
+	lstEntries := []encoder.ListEntry{}
+
+	for _, v := range streamEntries {
+		xrange := encoder.ListEntry{
+			EntryId: v.EntryId.String(),
+			Values:  store.ListEntriesFacts(v.Facts),
 		}
-		list = append(list, i)
+		lstEntries = append(lstEntries, xrange)
 	}
 
-	h.WriteResponse(encoder.NewList(list))
+	h.WriteResponse(encoder.NewList(lstEntries))
 	return nil
 }

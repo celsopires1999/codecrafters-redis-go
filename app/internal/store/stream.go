@@ -1,15 +1,20 @@
 package store
 
 import (
+	"cmp"
 	"fmt"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-type StreamId string
+type Entry struct {
+	EntryId EntryId
+	Facts   []Fact
+}
+
 type EntryId struct {
 	milli    string
 	sequence int
@@ -56,33 +61,35 @@ func (e EntryId) Compare(other EntryId) int {
 	return 0
 }
 
-type Entry struct {
+type Fact struct {
 	key   string
 	value string
 }
 
-func NewEntry(key, value string) Entry {
-	return Entry{key: key, value: value}
+func NewFact(key, value string) Fact {
+	return Fact{key: key, value: value}
 }
 
-func (e Entry) GetKV() []string {
+func (e Fact) GetKV() []string {
 	return []string{e.key, e.value}
 }
 
+type StreamId string
+
 type StreamType struct {
-	stream map[StreamId]map[EntryId][]Entry
+	stream map[StreamId]map[EntryId][]Fact
 	mu     sync.Mutex
 }
 
-func (s *StreamType) Set(streamId StreamId, entryId EntryId, entries []Entry) {
+func (s *StreamType) Set(streamId StreamId, entryId EntryId, entries []Fact) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, ok := s.stream[streamId]; !ok {
-		s.stream[streamId] = make(map[EntryId][]Entry)
+		s.stream[streamId] = make(map[EntryId][]Fact)
 	}
 	if _, ok := s.stream[streamId][entryId]; !ok {
-		s.stream[streamId][entryId] = []Entry{}
+		s.stream[streamId][entryId] = []Fact{}
 	}
 
 	s.stream[streamId][entryId] = append(s.stream[streamId][entryId],
@@ -166,29 +173,37 @@ func (s *StreamType) GetEntryIds(streamId StreamId) []EntryId {
 		keys = append(keys, k)
 	}
 
-	sort.Slice(keys, func(i, j int) bool {
-		if keys[i].milli == keys[j].milli {
-			return keys[i].sequence < keys[j].sequence
+	slices.SortFunc(keys, func(a, b EntryId) int {
+		if n := cmp.Compare(a.milli, b.milli); n != 0 {
+			return n
 		}
-		return keys[i].milli < keys[j].milli
+		// If millis are equal, order by sequence
+		return cmp.Compare(a.sequence, b.sequence)
 	})
-
 	return keys
 }
 
-func (s *StreamType) List(streamId StreamId, start EntryId, end EntryId) map[EntryId][]Entry {
-	output := map[EntryId][]Entry{}
-
+func (s *StreamType) FindGreater(streamId StreamId, entry EntryId) (output []Entry) {
 	for _, entryId := range s.GetEntryIds(streamId) {
-		if entryId.Compare(start) >= 0 && entryId.Compare(end) <= 0 {
-			output[entryId] = s.stream[streamId][entryId]
+		if entryId.Compare(entry) > 0 {
+			output = append(output, Entry{entryId, s.stream[streamId][entryId]})
 		}
 	}
 
-	return output
+	return
 }
 
-func ListEntriesValues(entries []Entry) (output []string) {
+func (s *StreamType) FindStarEnd(streamId StreamId, start EntryId, end EntryId) (output []Entry) {
+	for _, entryId := range s.GetEntryIds(streamId) {
+		if entryId.Compare(start) >= 0 && entryId.Compare(end) <= 0 {
+			output = append(output, Entry{entryId, s.stream[streamId][entryId]})
+		}
+	}
+
+	return
+}
+
+func ListEntriesFacts(entries []Fact) (output []string) {
 	for _, entry := range entries {
 		output = append(output, entry.GetKV()...)
 	}

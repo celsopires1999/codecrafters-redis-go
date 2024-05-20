@@ -30,20 +30,41 @@ func NewArray(data []string) string {
 	return array
 }
 
-type ListItem struct {
-	Id     string
-	Values []string
+type ListEntry struct {
+	EntryId string
+	Values  []string
 }
 
-func NewList(data []ListItem) string {
+func NewList(data []ListEntry) string {
 	var list string
 	list += fmt.Sprintf("*%d\r\n", len(data))
 	for _, v := range data {
 		list += "*2\r\n"
-		list += NewBulkString(v.Id)
+		list += NewBulkString(v.EntryId)
 		list += NewArray(v.Values)
 	}
 	return list
+}
+
+type ListStream struct {
+	StreamId string
+	Entries  []ListEntry
+}
+
+func NewRead(data []ListStream) string {
+	var read string
+	read += fmt.Sprintf("*%d\r\n", len(data))
+	read += "*2\r\n"
+	for _, v := range data {
+		read += NewBulkString(v.StreamId)
+		read += fmt.Sprintf("*%d\r\n", len(v.Entries))
+		for _, w := range v.Entries {
+			read += "*2\r\n"
+			read += NewBulkString(w.EntryId)
+			read += NewArray(w.Values)
+		}
+	}
+	return read
 }
 
 func NewError(data string) string {

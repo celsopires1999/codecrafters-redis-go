@@ -68,13 +68,13 @@ func validateXaddCommand(userCommand *Command) error {
 	return nil
 }
 
-func parseStreamIdAndEntries(userCommand *Command) (store.StreamId, []store.Entry) {
+func parseStreamIdAndEntries(userCommand *Command) (store.StreamId, []store.Fact) {
 	streamId := store.StreamId(userCommand.Args[1])
 
-	var entries []store.Entry
+	var entries []store.Fact
 	for i := 3; i < len(userCommand.Args); i += 2 {
 		entries = append(entries,
-			store.NewEntry(userCommand.Args[i], userCommand.Args[i+1]))
+			store.NewFact(userCommand.Args[i], userCommand.Args[i+1]))
 	}
 	return streamId, entries
 }
