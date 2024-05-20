@@ -47,7 +47,7 @@ func handleXrange(h *Handler, userCommand *Command) error {
 	for _, v := range streamEntries {
 		xrange := encoder.ListEntry{
 			EntryId: v.EntryId.String(),
-			Values:  store.ListEntriesFacts(v.Facts),
+			Facts:   store.ListEntriesFacts(v.Facts),
 		}
 		lstEntries = append(lstEntries, xrange)
 	}

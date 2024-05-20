@@ -32,7 +32,7 @@ func NewArray(data []string) string {
 
 type ListEntry struct {
 	EntryId string
-	Values  []string
+	Facts   []string
 }
 
 func NewList(data []ListEntry) string {
@@ -41,7 +41,7 @@ func NewList(data []ListEntry) string {
 	for _, v := range data {
 		list += "*2\r\n"
 		list += NewBulkString(v.EntryId)
-		list += NewArray(v.Values)
+		list += NewArray(v.Facts)
 	}
 	return list
 }
@@ -54,14 +54,14 @@ type ListStream struct {
 func NewRead(data []ListStream) string {
 	var read string
 	read += fmt.Sprintf("*%d\r\n", len(data))
-	read += "*2\r\n"
 	for _, v := range data {
+		read += "*2\r\n"
 		read += NewBulkString(v.StreamId)
 		read += fmt.Sprintf("*%d\r\n", len(v.Entries))
 		for _, w := range v.Entries {
 			read += "*2\r\n"
 			read += NewBulkString(w.EntryId)
-			read += NewArray(w.Values)
+			read += NewArray(w.Facts)
 		}
 	}
 	return read
