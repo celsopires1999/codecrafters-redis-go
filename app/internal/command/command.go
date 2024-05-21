@@ -9,9 +9,15 @@ import (
 
 	"github.com/codecrafters-io/redis-starter-go/app/internal/config"
 	"github.com/codecrafters-io/redis-starter-go/app/internal/encoder"
+	"github.com/codecrafters-io/redis-starter-go/app/internal/util"
 	"github.com/codecrafters-io/redis-starter-go/rdb"
 )
 
+var ps util.PubSub
+
+func init() {
+	ps = util.NewPubSub()
+}
 func handlePing(h *Handler, _ *Command) error {
 	pingMsg := encoder.Pong
 	h.WriteResponse(pingMsg)

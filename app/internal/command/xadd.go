@@ -48,6 +48,7 @@ func handleXadd(h *Handler, userCommand *Command) error {
 	}
 
 	h.db.StreamType.Set(streamId, entryId, entries)
+	ps.Publish("xadd", string(streamId))
 
 	h.WriteResponse(encoder.NewString(entryId.String()))
 

@@ -2,6 +2,8 @@ package command
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/app/internal/encoder"
 	"github.com/codecrafters-io/redis-starter-go/app/internal/store"
@@ -12,31 +14,48 @@ func handleXread(h *Handler, userCommand *Command) error {
 		identifier string
 		streamIds  []string
 		entryIds   []string
+		hasBlock   bool
+		blockTime  int
 	}
 
 	type option int
-
 	const (
-		Single option = iota
-		Multiple
+		StreamsSingle option = iota
+		StreamsMultiple
+		Block
 	)
-
 	var opt option
-	switch len(userCommand.Args) {
-	case 4:
-		opt = Single
-	default:
-		opt = Multiple
-		if len(userCommand.Args)%2 != 0 {
-			return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
+
+	switch userCommand.Args[1] {
+	case "streams":
+		if len(userCommand.Args) == 4 {
+			opt = StreamsSingle
+		} else {
+			opt = StreamsMultiple
+			if len(userCommand.Args)%2 != 0 {
+				return fmt.Errorf("the number of arguments for %s is incorrect", userCommand.Args[0])
+			}
 		}
+	case "block":
+		if userCommand.Args[3] != "streams" {
+			return fmt.Errorf("invalid command arguments for %s command", userCommand.Args[0])
+		}
+		opt = Block
+		input.hasBlock = true
+		input.blockTime, _ = strconv.Atoi(userCommand.Args[2])
+		userCommand.Args = append(userCommand.Args[0:1], userCommand.Args[3:]...)
+	default:
+		return fmt.Errorf("invalid command arguments for %s command", userCommand.Args[0])
 	}
 
 	input.identifier = userCommand.Args[1]
-	if opt == Single {
+
+	if opt == StreamsSingle || opt == Block {
 		input.streamIds = []string{userCommand.Args[2]}
 		input.entryIds = []string{userCommand.Args[3]}
-	} else {
+	}
+
+	if opt == StreamsMultiple {
 		offset := 2
 		size := len(userCommand.Args) - offset
 		for i := 2; i < size/2+offset; i++ {
@@ -47,10 +66,31 @@ func handleXread(h *Handler, userCommand *Command) error {
 		}
 	}
 
+	// if blocks wait for a response
+	if input.hasBlock {
+	OuterLoop:
+		for {
+			ch := ps.Subscribe("xadd")
+			select {
+			case event := <-ch:
+				if event.Message == input.streamIds[0] {
+					break OuterLoop
+				}
+			case <-time.After(time.Duration(input.blockTime) * time.Millisecond):
+				h.WriteResponse(encoder.Null)
+				return nil
+			}
+			ps.Unsubscribe("xadd")
+		}
+	}
+	return writeXreadResponse(h, input.streamIds, input.entryIds)
+}
+
+func writeXreadResponse(h *Handler, streamIds []string, entryIds []string) error {
 	lstStreams := []encoder.ListStream{}
-	for s := 0; s < len(input.streamIds); s++ {
-		streamId := store.StreamId(input.streamIds[s])
-		entryId, err := store.ToEntryId(input.entryIds[s], 0)
+	for s := 0; s < len(streamIds); s++ {
+		streamId := store.StreamId(streamIds[s])
+		entryId, err := store.ToEntryId(entryIds[s], 0)
 		if err != nil {
 			return err
 		}
