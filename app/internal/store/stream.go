@@ -45,6 +45,7 @@ func (e EntryId) String() string {
 	return fmt.Sprintf("%s-%d", e.milli, e.sequence)
 }
 
+// Compare returns -1 if e < other, 1 if e > other, and 0 if e == other
 func (e EntryId) Compare(other EntryId) int {
 	if e.milli > other.milli {
 		return 1
@@ -200,6 +201,15 @@ func (s *StreamType) FindStarEnd(streamId StreamId, start EntryId, end EntryId) 
 		}
 	}
 
+	return
+}
+
+func (s *StreamType) FindLastEntryId(streamId StreamId) (lastEntryId EntryId) {
+	for entry := range s.stream[streamId] {
+		if lastEntryId.Compare(entry) == -1 {
+			lastEntryId = entry
+		}
+	}
 	return
 }
 

@@ -14,7 +14,6 @@ func handleXread(h *Handler, userCommand *Command) error {
 		identifier string
 		streamIds  []string
 		entryIds   []string
-		hasBlock   bool
 		blockTime  int
 	}
 
@@ -27,6 +26,7 @@ func handleXread(h *Handler, userCommand *Command) error {
 	)
 	var opt option
 
+	fmt.Println("userCommand.Args:", userCommand.Args)
 	switch userCommand.Args[1] {
 	case "streams":
 		if len(userCommand.Args) == 4 {
@@ -41,13 +41,11 @@ func handleXread(h *Handler, userCommand *Command) error {
 		if userCommand.Args[3] != "streams" {
 			return fmt.Errorf("invalid command arguments for %s command", userCommand.Args[0])
 		}
-		if userCommand.Args[2] == "0" || userCommand.Args[2] == "\\x00" {
+		if input.blockTime, _ = strconv.Atoi(userCommand.Args[2]); input.blockTime == 0 {
 			opt = Block
 		} else {
 			opt = BlockWithTimeout
 		}
-		input.hasBlock = true
-		input.blockTime, _ = strconv.Atoi(userCommand.Args[2])
 		userCommand.Args = append(userCommand.Args[0:1], userCommand.Args[3:]...)
 	default:
 		return fmt.Errorf("invalid command arguments for %s command", userCommand.Args[0])
@@ -67,6 +65,11 @@ func handleXread(h *Handler, userCommand *Command) error {
 	} else {
 		input.streamIds = []string{userCommand.Args[2]}
 		input.entryIds = []string{userCommand.Args[3]}
+	}
+
+	if input.entryIds[0] == "$" {
+		input.entryIds[0] = h.db.StreamType.FindLastEntryId(
+			store.StreamId(input.streamIds[0])).String()
 	}
 
 	if opt == Block {
@@ -100,7 +103,6 @@ func doBlockWithTimeout(h *Handler, streamId string, blockTime int) error {
 }
 
 func doBlock(streamId string) {
-
 	ch := ps.Subscribe("xadd")
 	defer ps.Unsubscribe("xadd")
 	for {
