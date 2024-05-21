@@ -23,6 +23,7 @@ func handleXread(h *Handler, userCommand *Command) error {
 		StreamsSingle option = iota
 		StreamsMultiple
 		Block
+		BlockWithTimeout
 	)
 	var opt option
 
@@ -40,7 +41,11 @@ func handleXread(h *Handler, userCommand *Command) error {
 		if userCommand.Args[3] != "streams" {
 			return fmt.Errorf("invalid command arguments for %s command", userCommand.Args[0])
 		}
-		opt = Block
+		if userCommand.Args[2] == "0" || userCommand.Args[2] == "\\x00" {
+			opt = Block
+		} else {
+			opt = BlockWithTimeout
+		}
 		input.hasBlock = true
 		input.blockTime, _ = strconv.Atoi(userCommand.Args[2])
 		userCommand.Args = append(userCommand.Args[0:1], userCommand.Args[3:]...)
@@ -49,11 +54,6 @@ func handleXread(h *Handler, userCommand *Command) error {
 	}
 
 	input.identifier = userCommand.Args[1]
-
-	if opt == StreamsSingle || opt == Block {
-		input.streamIds = []string{userCommand.Args[2]}
-		input.entryIds = []string{userCommand.Args[3]}
-	}
 
 	if opt == StreamsMultiple {
 		offset := 2
@@ -64,26 +64,51 @@ func handleXread(h *Handler, userCommand *Command) error {
 		for i := size/2 + offset; i < size+offset; i++ {
 			input.entryIds = append(input.entryIds, userCommand.Args[i])
 		}
+	} else {
+		input.streamIds = []string{userCommand.Args[2]}
+		input.entryIds = []string{userCommand.Args[3]}
 	}
 
-	// if blocks wait for a response
-	if input.hasBlock {
-	OuterLoop:
-		for {
-			ch := ps.Subscribe("xadd")
-			select {
-			case event := <-ch:
-				if event.Message == input.streamIds[0] {
-					break OuterLoop
-				}
-			case <-time.After(time.Duration(input.blockTime) * time.Millisecond):
-				h.WriteResponse(encoder.Null)
-				return nil
-			}
-			ps.Unsubscribe("xadd")
+	if opt == Block {
+		doBlock(input.streamIds[0])
+	}
+
+	if opt == BlockWithTimeout {
+		err := doBlockWithTimeout(h, input.streamIds[0], input.blockTime)
+		if err != nil {
+			return err
 		}
 	}
+
 	return writeXreadResponse(h, input.streamIds, input.entryIds)
+}
+
+func doBlockWithTimeout(h *Handler, streamId string, blockTime int) error {
+	for {
+		ch := ps.Subscribe("xadd")
+		defer ps.Unsubscribe("xadd")
+		select {
+		case event := <-ch:
+			if event.Message == streamId {
+				return nil
+			}
+		case <-time.After(time.Duration(blockTime) * time.Millisecond):
+			h.WriteResponse(encoder.Null)
+			return nil
+		}
+	}
+}
+
+func doBlock(streamId string) {
+
+	ch := ps.Subscribe("xadd")
+	defer ps.Unsubscribe("xadd")
+	for {
+		event := <-ch
+		if event.Message == streamId {
+			return
+		}
+	}
 }
 
 func writeXreadResponse(h *Handler, streamIds []string, entryIds []string) error {
